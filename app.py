@@ -2,11 +2,18 @@ from flask import Flask, redirect, request, Response
 import requests
 from urllib.parse import urljoin
 import os
-
 from proxy_with_session import get_session_object
 
 app = Flask(__name__)
+# Add a secret key for session management
+app.secret_key = os.environ.get("SECRET_KEY")
 
+if not app.secret_key:
+    import sys
+    print("ERROR: No SECRET_KEY environment variable set. Exiting for security.", file=sys.stderr)
+    sys.exit(1)
+
+    
 # Target URL (LinkedIn)
 TARGET_URL = "https://www.linkedin.com"
 
