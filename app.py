@@ -1,7 +1,9 @@
-from flask import Flask, request, Response
+from flask import Flask, redirect, request, Response
 import requests
 from urllib.parse import urljoin
 import os
+
+from proxy_with_session import get_session_object
 
 app = Flask(__name__)
 
@@ -158,6 +160,104 @@ def index():
     </html>
     '''
 
+
+@app.route('/login', methods=['GET', 'POST'])
+def direct_login():
+    """Handle LinkedIn login directly"""
+    if request.method == 'GET':
+        # Show a simple login form
+        return '''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>LinkedIn Login</title>
+            <style>
+                body { font-family: Arial, sans-serif; max-width: 400px; margin: 0 auto; padding: 20px; }
+                h1 { color: #0077b5; }
+                .form-group { margin-bottom: 15px; }
+                label { display: block; margin-bottom: 5px; }
+                input[type="text"], input[type="password"] { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+                button { padding: 10px 15px; background-color: #0077b5; color: white; border: none; border-radius: 4px; cursor: pointer; }
+                .note { background-color: #f8f8f8; padding: 10px; border-left: 4px solid #0077b5; margin: 20px 0; }
+            </style>
+        </head>
+        <body>
+            <h1>LinkedIn Login</h1>
+            <p>Enter your LinkedIn credentials to log in through the proxy</p>
+            
+            <form method="POST" action="/login">
+                <div class="form-group">
+                    <label for="username">Email or Phone</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <button type="submit">Log In</button>
+            </form>
+            
+            <div class="note">
+                <p><strong>Note:</strong> Your credentials are sent directly to LinkedIn through the proxy server. They are not stored on the proxy server itself.</p>
+            </div>
+        </body>
+        </html>
+        '''
+    else:
+        # Process login POST request
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if not username or not password:
+            return "Username and password are required", 400
+            
+        # Get the session for this user
+        s = get_session_object()
+        
+        try:
+            # First make a GET request to the login page to get the CSRF token
+            login_page = s.get('https://www.linkedin.com/login')
+            
+            # Extract CSRF token from the page
+            import re
+            csrf_token = None
+            match = re.search(r'name="loginCsrfParam"\s+value="([^"]+)"', login_page.text)
+            if match:
+                csrf_token = match.group(1)
+            
+            if not csrf_token:
+                return "Could not extract CSRF token, try again", 400
+                
+            # Prepare login data
+            login_data = {
+                'session_key': username,
+                'session_password': password,
+                'loginCsrfParam': csrf_token
+            }
+            
+            # Make the login request
+            login_resp = s.post(
+                'https://www.linkedin.com/checkpoint/lg/login-submit',
+                data=login_data,
+                headers={
+                    'Referer': 'https://www.linkedin.com/login',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            )
+            
+            # Check if login was successful
+            if login_resp.url.startswith('https://www.linkedin.com/feed'):
+                # If we're redirected to the feed page, login was successful
+                return redirect('/linkedin/feed/')
+            else:
+                # Pass through LinkedIn's response which may have error messages
+                return Response(login_resp.content, login_resp.status_code)
+                
+        except Exception as e:
+            return f"Login error: {str(e)}", 500
+        
 if __name__ == '__main__':
     # Run the app
     app.run(host='0.0.0.0', port=port, debug=True)
