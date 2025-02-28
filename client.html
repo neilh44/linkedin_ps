@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn Python Proxy Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #0077b5;
+            margin-top: 0;
+        }
+        .controls {
+            display: flex;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+        input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #0077b5;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #005e93;
+        }
+        .frame-container {
+            height: 700px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        .note {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f7ff;
+            border-left: 4px solid #0077b5;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LinkedIn Python Proxy Client</h1>
+        
+        <div class="controls">
+            <input type="text" id="path-input" placeholder="Enter LinkedIn path (e.g., /feed/, /jobs/, /in/username)" value="/feed/">
+            <button onclick="loadUrl()">Browse</button>
+        </div>
+        
+        <div class="frame-container">
+            <iframe id="result-frame" src="about:blank"></iframe>
+        </div>
+        
+        <div class="status" id="status-message">Ready - Enter a LinkedIn path and click Browse</div>
+        
+        <div class="note">
+            <p><strong>Note:</strong> This client connects to your Python proxy on Render. Replace "YOUR_RENDER_URL" in the JavaScript below with your actual Render deployment URL before using.</p>
+            <p>If you encounter loading issues, remember that Render's free tier has a cold start delay after periods of inactivity.</p>
+        </div>
+    </div>
+
+    <script>
+        // Set your Render deployment URL here
+        const PROXY_BASE_URL = "YOUR_RENDER_URL";
+        
+        function loadUrl() {
+            const pathInput = document.getElementById('path-input');
+            const statusMessage = document.getElementById('status-message');
+            const resultFrame = document.getElementById('result-frame');
+            
+            let path = pathInput.value.trim();
+            
+            // Handle full URLs
+            if (path.startsWith('http')) {
+                try {
+                    const url = new URL(path);
+                    if (url.hostname.includes('linkedin.com')) {
+                        path = url.pathname + url.search;
+                    } else {
+                        statusMessage.textContent = "Error: Please enter a LinkedIn URL";
+                        return;
+                    }
+                } catch (e) {
+                    statusMessage.textContent = "Error: Invalid URL format";
+                    return;
+                }
+            }
+            
+            // Ensure path starts with /
+            if (!path.startsWith('/')) {
+                path = '/' + path;
+            }
+            
+            // Update status
+            statusMessage.textContent = "Loading " + path + "...";
+            
+            // Construct the full proxy URL
+            const proxyUrl = PROXY_BASE_URL + '/linkedin' + path;
+            
+            // Load in iframe
+            resultFrame.src = proxyUrl;
+            
+            // Update status when loaded
+            resultFrame.onload = function() {
+                statusMessage.textContent = "Loaded: " + path;
+            };
+            
+            resultFrame.onerror = function() {
+                statusMessage.textContent = "Error loading content. Check console for details.";
+            };
+        }
+    </script>
+</body>
+</html>
