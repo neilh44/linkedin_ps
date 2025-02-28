@@ -31,8 +31,18 @@ def proxy(path):
     # Get headers from the request
     headers = {key: value for key, value in request.headers if key != 'Host'}
     
-    # Add User-Agent to help avoid detection
-    headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    # Add headers to appear more like a regular browser
+    headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7'
+    headers['Accept-Language'] = 'en-US,en;q=0.9'
+    headers['Sec-Ch-Ua'] = '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"'
+    headers['Sec-Ch-Ua-Mobile'] = '?0'
+    headers['Sec-Ch-Ua-Platform'] = '"macOS"'
+    headers['Sec-Fetch-Dest'] = 'document'
+    headers['Sec-Fetch-Mode'] = 'navigate'
+    headers['Sec-Fetch-Site'] = 'none'
+    headers['Sec-Fetch-User'] = '?1'
+    headers['Upgrade-Insecure-Requests'] = '1'
     
     try:
         # Forward the request to LinkedIn
@@ -52,8 +62,24 @@ def proxy(path):
         
         # Copy response headers from LinkedIn
         for key, value in resp.headers.items():
-            if key.lower() not in ('content-length', 'connection', 'transfer-encoding'):
+            if key.lower() not in ('content-length', 'connection', 'transfer-encoding', 'content-security-policy'):
                 response.headers[key] = value
+                
+        # Handle redirects manually
+        if resp.status_code in (301, 302, 303, 307, 308) and 'Location' in resp.headers:
+            redirect_url = resp.headers['Location']
+            # If it's an absolute URL
+            if redirect_url.startswith('http'):
+                # Convert back to our proxy path
+                if redirect_url.startswith(TARGET_URL):
+                    path = redirect_url[len(TARGET_URL):]
+                    response.headers['Location'] = f'/linkedin{path}'
+                else:
+                    # External redirect - just keep it
+                    pass
+            else:
+                # Relative URL - just prefix with /linkedin
+                response.headers['Location'] = f'/linkedin{redirect_url}'
                 
         # Add CORS headers
         response.headers['Access-Control-Allow-Origin'] = '*'
